@@ -34,10 +34,16 @@ add_executable(cache_benchmark
 target_link_libraries(cache_benchmark PRIVATE cache)
 
 # Сравнительный бенчмарк LRU vs LFU
-add_executable(cache_benchmark_lfu
+add_executable(cache_benchmark_lfu_vs_lru
     benchmarks/CacheBenchmarkLRUvsLFU.cpp
 )
-target_link_libraries(cache_benchmark_lfu PRIVATE cache)
+target_link_libraries(cache_benchmark_lfu_vs_lru PRIVATE cache)
+
+# Бенчмарк конкурентного доступа
+add_executable(concurrency_benchmark
+    benchmarks/ConcurrencyBenchmark.cpp
+)
+target_link_libraries(concurrency_benchmark PRIVATE cache)
 
 # ==================== Тестирование ====================
 # Опция для включения/выключения тестов
@@ -67,6 +73,7 @@ if(BUILD_TESTS)
         tests/GlobalTTLTest.cpp
         tests/NoExpirationTest.cpp
         tests/PerKeyTTLTest.cpp
+        tests/ConcurrencyTest.cpp
     )
     target_link_libraries(all_tests PRIVATE cache GTest::gtest_main)
     gtest_discover_tests(all_tests)
