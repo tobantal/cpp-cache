@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include <cache/Cache.hpp>
-#include <cache/policies/LFUPolicy.hpp>
+#include <cache/eviction/LFUPolicy.hpp>
 #include <cache/listeners/StatsListener.hpp>
 #include <string>
 

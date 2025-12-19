@@ -430,7 +430,7 @@ public:
 
 ```cpp
 #include <cache/Cache.hpp>
-#include <cache/policies/LRUPolicy.hpp>
+#include <cache/eviction/LRUPolicy.hpp>
 
 int main() {
     auto cache = Cache<std::string, UserData>(

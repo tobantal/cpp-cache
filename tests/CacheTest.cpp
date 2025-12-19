@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include <cache/Cache.hpp>
-#include <cache/policies/LRUPolicy.hpp>
+#include <cache/eviction/LRUPolicy.hpp>
 #include <string>
 
 /**

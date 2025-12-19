@@ -111,7 +111,7 @@ MVP + LFUPolicy + CacheStats + бенчмарки
 
 ```cpp
 #include <cache/Cache.hpp>
-#include <cache/policies/LRUPolicy.hpp>
+#include <cache/eviction/LRUPolicy.hpp>
 
 // Создание кэша с LRU политикой
 auto cache = Cache<std::string, int>(

@@ -2,8 +2,8 @@
 
 #include <algorithm>
 #include <cache/ICache.hpp>
-#include <cache/IEvictionPolicy.hpp>
-#include <cache/ICacheListener.hpp>
+#include <cache/eviction/IEvictionPolicy.hpp>
+#include <cache/listeners/ICacheListener.hpp>
 #include <cache/expiration/IExpirationPolicy.hpp>
 #include <cache/expiration/NoExpiration.hpp>
 #include <unordered_map>

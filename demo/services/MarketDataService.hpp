@@ -3,7 +3,7 @@
 #include "../models/MarketModels.hpp"
 #include "../stub/StubTinkoffApi.hpp"
 #include <cache/Cache.hpp>
-#include <cache/policies/LRUPolicy.hpp>
+#include <cache/eviction/LRUPolicy.hpp>
 #include <cache/listeners/StatsListener.hpp>
 #include <memory>
 #include <iostream>

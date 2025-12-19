@@ -55,49 +55,9 @@ if(BUILD_TESTS)
     FetchContent_MakeAvailable(googletest)
 
     enable_testing()
-
-    # ==================== Unit-тесты ====================
-    
-    # Тесты для Cache
-    add_executable(cache_test
-        tests/CacheTest.cpp
-    )
-    target_link_libraries(cache_test PRIVATE cache GTest::gtest_main)
-    
-    # Тесты для LRUPolicy
-    add_executable(lru_policy_test
-        tests/LRUPolicyTest.cpp
-    )
-    target_link_libraries(lru_policy_test PRIVATE cache GTest::gtest_main)
-    
-    # Тесты для LFUPolicy
-    add_executable(lfu_policy_test
-        tests/LFUPolicyTest.cpp
-    )
-    target_link_libraries(lfu_policy_test PRIVATE cache GTest::gtest_main)
-    
-    # Тесты интеграции Cache + LFU
-    add_executable(cache_lfu_test
-        tests/CacheLFUTest.cpp
-    )
-    target_link_libraries(cache_lfu_test PRIVATE cache GTest::gtest_main)
-    
-    # Тесты для слушателей
-    add_executable(listeners_test
-        tests/ListenersTest.cpp
-    )
-    target_link_libraries(listeners_test PRIVATE cache GTest::gtest_main)
-
-    # Регистрируем тесты в CTest
     include(GoogleTest)
-    gtest_discover_tests(cache_test)
-    gtest_discover_tests(lru_policy_test)
-    gtest_discover_tests(lfu_policy_test)
-    gtest_discover_tests(cache_lfu_test)
-    gtest_discover_tests(listeners_test)
-    
-    # ==================== Объединённый тест ====================
-    # Все тесты в одном исполняемом файле (удобно для CI)
+
+    # Все тесты в одном исполняемом файле
     add_executable(all_tests
         tests/CacheTest.cpp
         tests/LRUPolicyTest.cpp

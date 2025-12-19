@@ -1,6 +1,6 @@
 #include <cache/Cache.hpp>
-#include <cache/policies/LRUPolicy.hpp>
-#include <cache/policies/LFUPolicy.hpp>
+#include <cache/eviction/LRUPolicy.hpp>
+#include <cache/eviction/LFUPolicy.hpp>
 #include <cache/listeners/StatsListener.hpp>
 
 #include <iostream>

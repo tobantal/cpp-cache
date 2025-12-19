@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "cache/policies/LFUPolicy.hpp"
+#include "cache/eviction/LFUPolicy.hpp"
 #include <string>
 
 /**
