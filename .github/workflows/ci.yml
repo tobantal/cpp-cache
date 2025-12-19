@@ -30,15 +30,13 @@ jobs:
       run: |
         gcovr \
           --root . \
-          --exclude-directories 'tests' \
-          --exclude-directories 'demo' \
-          --exclude-directories 'build' \
-          --exclude-directories '_deps' \
-          --exclude-directories 'benchmarks' \
           --exclude '.*CMakeFiles/.*' \
           --exclude '.*CompilerIdCXX.*' \
           --exclude '.*CompilerIdC.*' \
           --exclude '.*cmake/.*' \
+          --exclude '.*/tests/.*' \
+          --exclude '.*_deps/.*' \
+          --exclude '.*/demo/.*' \
           --gcov-ignore-parse-errors=all \
           --html-details coverage.html \
           --print-summary
