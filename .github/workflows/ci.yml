@@ -34,9 +34,10 @@ jobs:
           --exclude '.*CompilerIdCXX.*' \
           --exclude '.*CompilerIdC.*' \
           --exclude '.*cmake/.*' \
-          --exclude '.*/tests/.*' \
+          --exclude '.*tests/.*' \
           --exclude '.*_deps/.*' \
-          --exclude '.*/demo/.*' \
+          --exclude '.*demo/.*' \
+          --exclude '.*benchmarks/.*' \
           --gcov-ignore-parse-errors=all \
           --html-details coverage.html \
           --print-summary
