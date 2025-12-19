@@ -35,7 +35,7 @@ target_link_libraries(cache_benchmark PRIVATE cache)
 
 # Сравнительный бенчмарк LRU vs LFU
 add_executable(cache_benchmark_lfu
-    benchmarks/CacheBenchmarkLFU.cpp
+    benchmarks/CacheBenchmarkLRUvsLFU.cpp
 )
 target_link_libraries(cache_benchmark_lfu PRIVATE cache)
 
