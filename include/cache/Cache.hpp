@@ -4,51 +4,88 @@
 #include <cache/ICache.hpp>
 #include <cache/IEvictionPolicy.hpp>
 #include <cache/ICacheListener.hpp>
+#include <cache/expiration/IExpirationPolicy.hpp>
+#include <cache/expiration/NoExpiration.hpp>
 #include <unordered_map>
 #include <memory>
 #include <vector>
 #include <stdexcept>
 
 /**
- * @brief Основной класс кэша с поддержкой сменных политик вытеснения
+ * @brief Основной класс кэша с поддержкой сменных политик вытеснения и TTL
  * @tparam K Тип ключа (должен быть hashable для unordered_map)
  * @tparam V Тип значения
  * 
  * Архитектура:
  * - Данные хранятся в std::unordered_map<K, V> — O(1) доступ
  * - Политика вытеснения инжектируется через конструктор (Strategy pattern)
+ * - Политика истечения (TTL) опциональна — по умолчанию NoExpiration
  * - Слушатели получают уведомления о событиях (Observer pattern)
  * 
+ * Два независимых механизма удаления:
+ * 1. Eviction (вытеснение) — при переполнении кэша, по политике LRU/LFU/FIFO
+ * 2. Expiration (истечение) — по времени жизни (TTL)
+ * 
  * Пример использования:
- *   auto cache = Cache<std::string, int>(100, std::make_unique<LRUPolicy<std::string>>());
- *   cache.put("key", 42);
- *   auto value = cache.get("key");  // std::optional<int>(42)
+ * @code
+ *   // Без TTL
+ *   auto cache = Cache<std::string, int>(100, 
+ *       std::make_unique<LRUPolicy<std::string>>());
+ *   
+ *   // С TTL 5 секунд
+ *   auto cache = Cache<std::string, int>(100, 
+ *       std::make_unique<LRUPolicy<std::string>>(),
+ *       std::make_unique<GlobalTTL<std::string>>(std::chrono::seconds(5)));
+ * @endcode
  */
 template<typename K, typename V>
 class Cache : public ICache<K, V> {
 public:
+    using Duration = typename IExpirationPolicy<K>::Duration;
+
     /**
-     * @brief Конструктор
+     * @brief Конструктор без TTL (элементы живут вечно)
      * @param capacity Максимальная ёмкость кэша (должна быть > 0)
-     * @param policy Политика вытеснения (ownership передаётся кэшу)
+     * @param evictionPolicy Политика вытеснения (ownership передаётся кэшу)
      */
-    Cache(size_t capacity, std::unique_ptr<IEvictionPolicy<K>> policy)
+    Cache(size_t capacity, std::unique_ptr<IEvictionPolicy<K>> evictionPolicy)
+        : Cache(capacity, std::move(evictionPolicy), 
+                std::make_unique<NoExpiration<K>>())
+    {}
+
+    /**
+     * @brief Конструктор с TTL политикой
+     * @param capacity Максимальная ёмкость кэша (должна быть > 0)
+     * @param evictionPolicy Политика вытеснения
+     * @param expirationPolicy Политика истечения (TTL)
+     */
+    Cache(size_t capacity, 
+          std::unique_ptr<IEvictionPolicy<K>> evictionPolicy,
+          std::unique_ptr<IExpirationPolicy<K>> expirationPolicy)
         : capacity_(capacity)
-        , policy_(std::move(policy))
+        , evictionPolicy_(std::move(evictionPolicy))
+        , expirationPolicy_(std::move(expirationPolicy))
     {
         if (capacity_ == 0) {
             throw std::invalid_argument("Cache capacity must be greater than 0");
         }
-        if (!policy_) {
+        if (!evictionPolicy_) {
             throw std::invalid_argument("Eviction policy cannot be null");
+        }
+        if (!expirationPolicy_) {
+            // Если не передана — используем NoExpiration
+            expirationPolicy_ = std::make_unique<NoExpiration<K>>();
         }
     }
 
     /**
      * @brief Получить значение по ключу
      * 
-     * При попадании (hit) уведомляем политику о доступе — 
-     * это обновит позицию ключа (например, в LRU переместит в начало).
+     * Логика:
+     * 1. Проверяем наличие ключа в data_
+     * 2. Если есть — проверяем TTL через expirationPolicy_
+     * 3. Если TTL истёк — удаляем элемент и возвращаем nullopt
+     * 4. Если не истёк — уведомляем политики и возвращаем значение
      */
     std::optional<V> get(const K& key) override {
         auto it = data_.find(key);
@@ -57,28 +94,51 @@ public:
             return std::nullopt;
         }
         
-        // Hit: уведомляем политику и слушателей
-        policy_->onAccess(key);
+        // Проверяем TTL
+        if (expirationPolicy_->isExpired(key)) {
+            // Элемент просрочен — удаляем
+            removeInternal(key, it);
+            notifyExpire(key);
+            notifyMiss(key);  // С точки зрения клиента — это miss
+            return std::nullopt;
+        }
+        
+        // Hit: уведомляем политики и слушателей
+        evictionPolicy_->onAccess(key);
+        expirationPolicy_->onAccess(key);  // Для SlidingTTL
         notifyHit(key);
         return it->second;
     }
 
     /**
-     * @brief Добавить или обновить значение
+     * @brief Добавить или обновить значение с TTL по умолчанию
      * 
      * Логика:
-     * 1. Если ключ существует — обновляем значение, уведомляем политику о доступе
+     * 1. Если ключ существует — обновляем значение и TTL
      * 2. Если ключ новый и кэш полон — вытесняем жертву
-     * 3. Вставляем новый ключ, уведомляем политику о вставке
+     * 3. Вставляем новый ключ, регистрируем в политиках
      */
     void put(const K& key, const V& value) override {
+        put(key, value, std::nullopt);  // Без кастомного TTL
+    }
+
+    /**
+     * @brief Добавить или обновить значение с кастомным TTL
+     * @param key Ключ
+     * @param value Значение
+     * @param ttl Индивидуальный TTL (для PerKeyTTL), игнорируется для GlobalTTL
+     */
+    void put(const K& key, const V& value, std::optional<Duration> ttl) {
         auto it = data_.find(key);
         
         if (it != data_.end()) {
             // Update существующего ключа
             V oldValue = it->second;
             it->second = value;
-            policy_->onAccess(key);
+            evictionPolicy_->onAccess(key);
+            // При обновлении обновляем и TTL
+            expirationPolicy_->onRemove(key);
+            expirationPolicy_->onInsert(key, ttl);
             notifyUpdate(key, oldValue, value);
             return;
         }
@@ -90,7 +150,8 @@ public:
         
         // Вставка нового элемента
         data_[key] = value;
-        policy_->onInsert(key);
+        evictionPolicy_->onInsert(key);
+        expirationPolicy_->onInsert(key, ttl);
         notifyInsert(key, value);
     }
 
@@ -104,8 +165,7 @@ public:
             return false;
         }
         
-        data_.erase(it);
-        policy_->onRemove(key);
+        removeInternal(key, it);
         notifyRemove(key);
         return true;
     }
@@ -116,7 +176,8 @@ public:
     void clear() override {
         size_t count = data_.size();
         data_.clear();
-        policy_->clear();
+        evictionPolicy_->clear();
+        expirationPolicy_->clear();
         notifyClear(count);
     }
 
@@ -125,47 +186,112 @@ public:
     }
 
     bool contains(const K& key) const override {
-        return data_.find(key) != data_.end();
+        auto it = data_.find(key);
+        if (it == data_.end()) {
+            return false;
+        }
+        // Проверяем TTL (но не удаляем — contains должен быть const)
+        return !expirationPolicy_->isExpired(key);
     }
 
     size_t capacity() const override {
         return capacity_;
     }
 
-    // ==================== Управление политикой ====================
+    // ==================== TTL-специфичные методы ====================
+
+    /**
+     * @brief Получить оставшееся время жизни ключа
+     * @param key Ключ
+     * @return Оставшееся время или nullopt если бессрочный/не найден
+     */
+    std::optional<Duration> timeToLive(const K& key) const {
+        if (!contains(key)) {
+            return std::nullopt;
+        }
+        return expirationPolicy_->timeToLive(key);
+    }
+
+    /**
+     * @brief Удалить все просроченные элементы
+     * @return Количество удалённых элементов
+     * 
+     * Полезно для периодической фоновой очистки:
+     * @code
+     *   // Каждую минуту
+     *   scheduler.every(std::chrono::minutes(1), [&]() {
+     *       size_t removed = cache.removeExpired();
+     *       log("Removed {} expired entries", removed);
+     *   });
+     * @endcode
+     */
+    size_t removeExpired() {
+        std::vector<K> expired = expirationPolicy_->collectExpired();
+        size_t count = 0;
+        
+        for (const K& key : expired) {
+            auto it = data_.find(key);
+            if (it != data_.end()) {
+                removeInternal(key, it);
+                notifyExpire(key);
+                ++count;
+            }
+        }
+        
+        return count;
+    }
+
+    // ==================== Управление политиками ====================
 
     /**
      * @brief Динамическая смена политики вытеснения
      * @param policy Новая политика
-     * 
-     * При смене политики:
-     * - Старая статистика теряется (упрощённый подход для MVP)
-     * - Новая политика инициализируется текущими ключами
-     * 
-     * Альтернатива: можно было бы мигрировать данные из старой политики,
-     * но это усложняет код и не всегда имеет смысл (разные политики
-     * хранят разные метаданные — частоту, время и т.д.)
      */
     void setEvictionPolicy(std::unique_ptr<IEvictionPolicy<K>> policy) {
         if (!policy) {
             throw std::invalid_argument("Eviction policy cannot be null");
         }
         
-        policy_ = std::move(policy);
+        evictionPolicy_ = std::move(policy);
         
         // Регистрируем существующие ключи в новой политике
         for (const auto& pair : data_) {
-            policy_->onInsert(pair.first);
+            evictionPolicy_->onInsert(pair.first);
         }
+    }
+
+    /**
+     * @brief Динамическая смена политики истечения (TTL)
+     * @param policy Новая политика
+     * 
+     * @note При смене политики все существующие элементы
+     *       регистрируются в новой политике с её default TTL.
+     */
+    void setExpirationPolicy(std::unique_ptr<IExpirationPolicy<K>> policy) {
+        if (!policy) {
+            expirationPolicy_ = std::make_unique<NoExpiration<K>>();
+        } else {
+            expirationPolicy_ = std::move(policy);
+        }
+        
+        // Регистрируем существующие ключи в новой политике
+        for (const auto& pair : data_) {
+            expirationPolicy_->onInsert(pair.first, std::nullopt);
+        }
+    }
+
+    /**
+     * @brief Получить указатель на политику истечения (для настройки)
+     * @return Указатель на текущую политику TTL
+     */
+    IExpirationPolicy<K>* expirationPolicy() {
+        return expirationPolicy_.get();
     }
 
     // ==================== Управление слушателями ====================
 
     /**
      * @brief Добавить слушателя событий
-     * 
-     * shared_ptr позволяет одному слушателю подписаться на несколько кэшей
-     * и безопасно удалиться когда больше не нужен.
      */
     void addListener(std::shared_ptr<ICacheListener<K, V>> listener) {
         if (listener) {
@@ -185,30 +311,30 @@ public:
 
 private:
     /**
+     * @brief Внутреннее удаление элемента (без уведомления listeners)
+     */
+    void removeInternal(const K& key, 
+                        typename std::unordered_map<K, V>::iterator it) {
+        data_.erase(it);
+        evictionPolicy_->onRemove(key);
+        expirationPolicy_->onRemove(key);
+    }
+
+    /**
      * @brief Вытеснить один элемент по политике
-     * 
-     * Порядок важен:
-     * 1. Получаем жертву от политики
-     * 2. Сохраняем значение для уведомления
-     * 3. Удаляем из data_
-     * 4. Уведомляем политику об удалении
-     * 5. Уведомляем слушателей
      */
     void evict() {
-        K victim = policy_->selectVictim();
+        K victim = evictionPolicy_->selectVictim();
         
         auto it = data_.find(victim);
         if (it != data_.end()) {
             V value = it->second;
-            data_.erase(it);
-            policy_->onRemove(victim);
+            removeInternal(victim, it);
             notifyEvict(victim, value);
         }
     }
 
     // ==================== Уведомления слушателей ====================
-    // Проверка listeners_.empty() — оптимизация для бенчмарков:
-    // если слушателей нет, не тратим время на цикл
 
     void notifyHit(const K& key) {
         if (listeners_.empty()) return;
@@ -259,9 +385,19 @@ private:
         }
     }
 
+    /**
+     * @brief Уведомление об истечении TTL (отдельно от evict/remove)
+     */
+    void notifyExpire(const K& key) {
+        // Можно добавить отдельный callback в ICacheListener
+        // Пока просто логируем как remove
+        (void)key;
+    }
+
 private:
     size_t capacity_;
     std::unordered_map<K, V> data_;
-    std::unique_ptr<IEvictionPolicy<K>> policy_;
+    std::unique_ptr<IEvictionPolicy<K>> evictionPolicy_;
+    std::unique_ptr<IExpirationPolicy<K>> expirationPolicy_;
     std::vector<std::shared_ptr<ICacheListener<K, V>>> listeners_;
 };

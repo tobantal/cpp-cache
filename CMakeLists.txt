@@ -104,6 +104,9 @@ if(BUILD_TESTS)
         tests/LFUPolicyTest.cpp
         tests/CacheLFUTest.cpp
         tests/ListenersTest.cpp
+        tests/GlobalTTLTest.cpp
+        tests/NoExpirationTest.cpp
+        tests/PerKeyTTLTest.cpp
     )
     target_link_libraries(all_tests PRIVATE cache GTest::gtest_main)
     gtest_discover_tests(all_tests)
