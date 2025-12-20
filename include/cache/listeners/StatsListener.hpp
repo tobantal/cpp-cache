@@ -2,6 +2,7 @@
 
 #include <cache/listeners/ICacheListener.hpp>
 #include <cstdint>
+#include <atomic>
 
 /**
  * @brief Слушатель для сбора статистики кэша
@@ -18,8 +19,7 @@
  *   // ... работа с кэшем ...
  *   std::cout << "Hit rate: " << stats->hitRate() << std::endl;
  * 
- * Примечание: счётчики не atomic, т.к. базовый Cache однопоточный.
- * Для многопоточного кэша нужна отдельная версия с atomic<uint64_t>.
+ * Примечание: счётчики atomic для потокобезопасности.
  */
 template<typename K, typename V>
 class StatsListener : public ICacheListener<K, V> {
@@ -106,11 +106,11 @@ public:
     }
 
 private:
-    uint64_t hits_ = 0;
-    uint64_t misses_ = 0;
-    uint64_t inserts_ = 0;
-    uint64_t updates_ = 0;
-    uint64_t evictions_ = 0;
-    uint64_t removes_ = 0;
-    uint64_t clears_ = 0;
+    std::atomic<uint64_t> hits_{0};
+    std::atomic<uint64_t> misses_{0};
+    std::atomic<uint64_t> inserts_{0};
+    std::atomic<uint64_t> updates_{0};
+    std::atomic<uint64_t> evictions_{0};
+    std::atomic<uint64_t> removes_{0};
+    std::atomic<uint64_t> clears_{0};
 };

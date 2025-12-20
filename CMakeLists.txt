@@ -74,6 +74,8 @@ if(BUILD_TESTS)
         tests/NoExpirationTest.cpp
         tests/PerKeyTTLTest.cpp
         tests/ConcurrencyTest.cpp
+        tests/ThreadSafeQueueTest.cpp
+        tests/ThreadPerListenerCompositeTest.cpp
     )
     target_link_libraries(all_tests PRIVATE cache GTest::gtest_main)
     gtest_discover_tests(all_tests)
