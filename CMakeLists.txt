@@ -76,6 +76,9 @@ if(BUILD_TESTS)
         tests/ConcurrencyTest.cpp
         tests/ThreadSafeQueueTest.cpp
         tests/ThreadPerListenerCompositeTest.cpp
+        tests/BinarySerializerTest.cpp
+        tests/PersistenceListenerTest.cpp
+        tests/SnapshotPersistenceTest.cpp
     )
     target_link_libraries(all_tests PRIVATE cache GTest::gtest_main)
     gtest_discover_tests(all_tests)
