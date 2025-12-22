@@ -108,3 +108,6 @@ message(STATUS "C++ Standard:   ${CMAKE_CXX_STANDARD}")
 message(STATUS "Build Tests:    ${BUILD_TESTS}")
 message(STATUS "Compiler:       ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
 message(STATUS "")
+
+# ===== Benchmarks ====
+add_subdirectory(benchmarks)

@@ -1,7 +1,7 @@
 # Проектная работа: Модульная библиотека кэширования
 
-> **Курс**: Алгоритмы и структуры данных  
-> **Технологический стек**: C++17, CMake, GoogleTest 
+> **Курс**: Алгоритмы и структуры данных
+> **Технологический стек**: C++17, CMake, GoogleTest
 >
 > **Студент**: Тоболкин Антон
 
@@ -9,9 +9,9 @@
 
 ## 1. Описание проекта
 
-**Цель**: разработка модульной библиотеки кэширования с гибкой архитектурой, позволяющей динамически выбирать и менять политики вытеснения данных.
+**Цель**: разработка модульной библиотеки in-memory кэширования с возможностью выбора и комбинирования политик вытеснения, истечения (TTL), наблюдения (listeners) и многопоточности.
 
-**Результат**: header-only библиотека на C++17, готовая для интеграции в другие проекты.
+**Результат**: header-only библиотека на C++17, предназначенная для использования и экспериментов с алгоритмами кэширования.
 
 ---
 
@@ -19,142 +19,177 @@
 
 ### 2.1 Применяемые паттерны
 
-| Паттерн | Применение |
-|---------|------------|
-| **Strategy** | Политики вытеснения (LRU/LFU/FIFO) — клиент выбирает алгоритм |
-| **State** | ARC (адаптивный кэш) — автоматическое переключение режимов |
-| **Decorator** | TTL, Thread-safety — обёртки добавляют функциональность |
-| **Builder** | Удобная конфигурация кэша |
-| **Dependency Injection** | Инъекция зависимостей через конструктор |
+| Паттерн                  | Применение в проекте                                       |
+| ------------------------ | ---------------------------------------------------------- |
+| **Strategy**             | Политики вытеснения (LRU, LFU) и политики expiration (TTL) |
+| **Decorator**            | ThreadSafeCache, ShardedCache, PersistenceListener         |
+| **Observer**             | Cache listeners (hit/miss/evict и др.)                     |
+| **Composite**            | Объединение listeners с поддержкой sync / async выполнения |
+| **Dependency Injection** | Все политики и listeners передаются через конструкторы     |
 
-### 2.2 Иерархия классов
+TODO: добавить.
+Command - внутри ThreadPerListenerComposite используется паттерн "команда" в потокобезопасной очереди.
+
+Добавить "строитель" после реализации Builder.
+
+---
+
+### 2.2 Иерархия основных интерфейсов и классов
 
 ```
 Cache<K, V>
 │
-├── IEvictionPolicy<K>           — политика вытеснения
-│   ├── LRUPolicy                  (Least Recently Used)
-│   ├── LFUPolicy                  (Least Frequently Used)
-│   ├── FIFOPolicy                 (First In First Out)
-│   └── ARCPolicy                  (Adaptive Replacement Cache)
+├── IEvictionPolicy<K>            — политика вытеснения
+│   ├── LRUPolicy                 (Least Recently Used)
+│   └── LFUPolicy                 (Least Frequently Used)
 │
-├── IPersistence<K, V>           — стратегия сохранения
-│   ├── NoPersistence
-│   ├── SnapshotPersistence
-│   └── WALPersistence
-│
-├── IExpirationPolicy<K>         — политика истечения (TTL)
+├── IExpirationPolicy<K>          — политика истечения (TTL)
 │   ├── NoExpiration
 │   ├── GlobalTTL
 │   └── PerKeyTTL
 │
-└── IConcurrencyPolicy           — политика многопоточности
-    ├── SingleThreaded
-    ├── MutexBased
-    └── ShardedLock
+├── ICacheListener<K, V>          — наблюдатель событий кэша
+│   ├── StatsListener
+│   ├── LoggingListener
+│   └── PersistenceListener
+│
+├── ThreadSafeCache<K, V>         — потокобезопасная обёртка (mutex)
+│
+└── ShardedCache<K, V>            — кэш с шардингом по ключу
 ```
 
 ---
 
 ## 3. Алгоритмы и структуры данных
 
-| Алгоритм | Структуры данных | Сложность |
-|----------|------------------|-----------|
-| **LRU** | Двусвязный список + хеш-таблица | O(1) |
-| **LFU** | Хеш-таблица + map частот со списками | O(1) амортиз. |
-| **FIFO** | Очередь + хеш-таблица | O(1) |
-| **ARC** | 4 списка (T1, T2, B1, B2) + параметр адаптации | O(1) |
+| Алгоритм | Используемые структуры данных                     | Сложность операций |
+| -------- | ------------------------------------------------- | ------------------ |
+| **LRU**  | `std::list` + `std::unordered_map`                | O(1)               |
+| **LFU**  | `std::unordered_map` + таблица частот со списками | O(1) амортиз.      |
 
 ---
 
-## 4. Объём работ
+## 4. Реализованный функционал
 
-### 4.1 Обязательная часть (MVP)
+### 4.1 Базовый кэш
 
-| Компонент | Описание | Часы |
-|-----------|----------|------|
-| Интерфейсы | ICache, IEvictionPolicy | 2–3 |
-| Cache | Основной класс с инъекцией зависимостей | 4–5 |
-| LRUPolicy | Двусвязный список + hashmap | 5–7 |
-| Unit-тесты | GoogleTest | 3–4 |
-| Бенчмарк | Измерение производительности | 2–3 |
-
-**Итого MVP**: 16–22 часа
-
-### 4.2 Дополнительные модули
-
-| Модуль | Зависимости | Часы |
-|--------|-------------|------|
-| LFUPolicy | MVP | 6–8 |
-| FIFOPolicy | MVP | 2–3 |
-| ARCPolicy | LFUPolicy | 10–12 |
-| SnapshotPersistence | MVP | 4–6 |
-| WALPersistence | MVP | 6–8 |
-| GlobalTTL | MVP | 3–4 |
-| PerKeyTTL | GlobalTTL | 4–6 |
-| MutexWrapper | MVP | 3–4 |
-| ShardedCache | MutexWrapper | 8–10 |
-| CacheStats | MVP | 3–4 |
-
-### 4.3 Планируемый сценарий
-
-**Минимальный план (25–32 часа)**:
-```
-MVP + LFUPolicy + CacheStats + бенчмарки
-```
-
-Результат: кэш с двумя политиками вытеснения (LRU, LFU), статистикой hit/miss, сравнительными бенчмарками.
+* `Cache<K, V>` с фиксированной ёмкостью
+* Операции: `put`, `get`, `remove`, `contains`, `clear`
+* `get` возвращает `std::optional<V>`
 
 ---
 
-## 5. Пример использования
+### 4.2 Политики вытеснения
 
-```cpp
-#include <cache/Cache.hpp>
-#include <cache/eviction/LRUPolicy.hpp>
-
-// Создание кэша с LRU политикой
-auto cache = Cache<std::string, int>(
-    1000,  // ёмкость
-    std::make_unique<LRUPolicy<std::string>>()
-);
-
-cache.put("key1", 100);
-
-if (auto value = cache.get("key1")) {
-    std::cout << value.value() << std::endl;
-}
-
-// Динамическая смена политики на LFU
-cache.setEvictionPolicy(std::make_unique<LFUPolicy<std::string>>());
-```
+* LRU — вытеснение по принципу «давно не использовался»
+* LFU — вытеснение по частоте обращений с LRU tie-breaker
 
 ---
 
-## 6. Бенчмарки
+### 4.3 TTL / Expiration
 
-| Метрика | Описание |
-|---------|----------|
-| Throughput | Операций в секунду (ops/sec) |
-| Hit Rate | Процент попаданий в кэш |
-| Сравнение политик | LRU vs LFU при разных нагрузках |
+* `NoExpiration`
+* `GlobalTTL`
+* `PerKeyTTL`
+
+Истёкшие элементы удаляются лениво при обращении к ключу.
+
+---
+
+### 4.4 Listeners
+
+Поддерживаемые события:
+
+* hit / miss
+* insert / update
+* evict
+* remove
+* clear
+* expire
+
+Listeners могут выполняться:
+
+* синхронно
+* асинхронно (отдельный поток на listener)
+
+---
+
+### 4.5 Persistence
+
+* Snapshot persistence
+* Полная сериализация состояния кэша
+* Бинарный формат
+
+---
+
+### 4.6 Concurrency
+
+* `ThreadSafeCache` — глобальный mutex
+* `ShardedCache` — несколько shard'ов с независимыми mutex
+
+---
+
+## 5. Бенчмарки
+
+Реализованы бенчмарки для следующих сценариев:
+
+| Сценарий          | Описание                          |
+| ----------------- | --------------------------------- |
+| LRU vs LFU        | Сравнение политик вытеснения      |
+| Put / Get         | Пропускная способность операций   |
+| Uniform access    | Равномерное распределение ключей  |
+| Zipf distribution | Нагрузка с перекосом популярности |
+| Temporal locality | Временная локальность             |
+| Listener overhead | Sync vs Async listeners           |
+| Concurrency       | ThreadSafe vs Sharded             |
+
+---
+
+## 6. Сравнение с существующими библиотеками
+
+### Используемые библиотеки для сравнения
+
+* **facebook/CacheLib**
+* **tsl::lru_cache**
+* **gkiryaziev/lru_cache**
+
+### Feature comparison
+
+| Feature            | This project | CacheLib | tsl::lru_cache | gkiryaziev/lru_cache |
+| ------------------ | ------------ | -------- | -------------- | -------------------- |
+| LRU                | yes          | yes      | yes            | yes                  |
+| LFU                | yes          | limited  | no             | no                   |
+| TTL                | yes          | yes      | no             | no                   |
+| Pluggable eviction | yes          | no       | no             | no                   |
+| Listeners / hooks  | yes          | yes      | no             | no                   |
+| Async hooks        | yes          | yes      | no             | no                   |
+| Persistence        | snapshot     | yes      | no             | no                   |
+| Thread-safe        | wrappers     | yes      | no             | no                   |
+| Sharded cache      | yes          | yes      | no             | no                   |
+| Header-only        | yes          | no       | yes            | yes                  |
 
 ---
 
 ## 7. Структура проекта
 
-```bash
-cache-lib/
-├── include/cache/          # Заголовочные файлы
-│   ├── ICache.hpp
-│   ├── IEvictionPolicy.hpp
-│   ├── Cache.hpp
-│   └── policies/
-│       ├── LRUPolicy.hpp
-│       └── LFUPolicy.hpp
-├── src/                    # Реализации
-├── tests/                  # Unit-тесты
-├── benchmarks/             # Бенчмарки
-├── demo/                   # Примеры
-└── CMakeLists.txt
+```text
+include/cache/
+  Cache.hpp
+  IEvictionPolicy.hpp
+  eviction/
+    LRUPolicy.hpp
+    LFUPolicy.hpp
+  expiration/
+  listeners/
+  concurrency/
+  persistence/
+
+benchmarks/
+tests/
+demo/
 ```
+
+---
+
+## 8. TODO / Открытые вопросы
+
