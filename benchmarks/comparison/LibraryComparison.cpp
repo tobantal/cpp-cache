@@ -404,9 +404,9 @@ int main() {
     std::cout << "\n";
     
     BenchmarkConfig config;
-    //config.setStandard();
+    config.setStandard();
     //config.setHeavy();
-    config.setVeryHeavy();
+    //config.setVeryHeavy();
     
     std::cout << "┌─ CONFIGURATION ──────────────────────────────────────────────┐\n";
     std::cout << "│ Cache Capacity:    " << std::setw(10) << config.cache_size << " elements\n";
