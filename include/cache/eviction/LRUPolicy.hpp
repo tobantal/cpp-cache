@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cache/eviction/IEvictionPolicy.hpp>
+#include "IEvictionPolicy.hpp"
 #include <list>
 #include <unordered_map>
 #include <stdexcept>

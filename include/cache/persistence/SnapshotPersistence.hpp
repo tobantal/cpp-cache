@@ -1,7 +1,7 @@
 #pragma once
 
-#include <cache/persistence/IPersistence.hpp>
-#include <cache/serialization/ISerializer.hpp>
+#include "IPersistence.hpp"
+#include "../serialization/ISerializer.hpp"
 #include <fstream>
 #include <mutex>
 #include <memory>

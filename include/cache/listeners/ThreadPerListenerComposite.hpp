@@ -1,7 +1,7 @@
 #pragma once
 
-#include <cache/listeners/ICacheListener.hpp>
-#include <cache/utils/ThreadSafeQueue.hpp>
+#include "ICacheListener.hpp"
+#include "../utils/ThreadSafeQueue.hpp"
 
 #include <vector>
 #include <memory>

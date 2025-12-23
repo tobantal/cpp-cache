@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cache/serialization/ISerializer.hpp>
+#include "ISerializer.hpp"
 #include <cstring>
 #include <string>
 #include <type_traits>

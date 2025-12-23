@@ -1,7 +1,7 @@
 #pragma once
 
-#include <cache/listeners/ICacheListener.hpp>
-#include <cache/persistence/IPersistence.hpp>
+#include "ICacheListener.hpp"
+#include "../persistence/IPersistence.hpp"
 #include <memory>
 
 /**
