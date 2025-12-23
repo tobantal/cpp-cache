@@ -1,9 +1,9 @@
 #pragma once
 
 #include "CacheStrategy.hpp"
-#include <cache/Cache.hpp>
-#include <cache/eviction/LRUPolicy.hpp>
-#include <cache/eviction/LFUPolicy.hpp>
+#include "../include/cache/Cache.hpp"
+#include "../include/cache/eviction/LRUPolicy.hpp"
+#include "../include/cache/eviction/LFUPolicy.hpp"
 #include <memory>
 
 /**
