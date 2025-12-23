@@ -9,13 +9,6 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -Wall -Wextra")
 
 include(FetchContent)
 
-# nlohmann_json (header-only) - для JSON вывода
-FetchContent_Declare(json
-    URL https://github.com/nlohmann/json/releases/download/v3.11.2/json.tar.xz
-    DOWNLOAD_NO_PROGRESS ON
-)
-FetchContent_MakeAvailable(json)
-
 # LRUCache11 (header-only) - базовая LRU реализация
 FetchContent_Declare(lrucache11
     GIT_REPOSITORY https://github.com/mohaps/lrucache11.git
@@ -45,7 +38,6 @@ target_include_directories(library_comparison PRIVATE
 )
 
 target_link_libraries(library_comparison PRIVATE
-    nlohmann_json::nlohmann_json
     pthread
 )
 
