@@ -39,8 +39,10 @@
 ```cpp
 template<typename K, typename V>
 class Cache {
+    size_t capacity_;
     std::unordered_map<K, V> data_;
-    std::unique_ptr<IEvictionPolicy<K>> policy_;
+    std::unique_ptr<IEvictionPolicy<K>> evictionPolicy_;
+    std::unique_ptr<IExpirationPolicy<K>> expirationPolicy_;
     std::vector<std::shared_ptr<ICacheListener<K, V>>> listeners_;
 };
 ```
@@ -48,6 +50,7 @@ class Cache {
 **Ключевые компоненты:**
 - `std::unordered_map` для O(1) lookup в среднем случае
 - `IEvictionPolicy` интерфейс для pluggable политик вытеснения
+- `IExpirationPolicy` интерфейс для TTL политик вытеснения
 - `ICacheListener` интерфейс для observer pattern'а
 
 ---
@@ -402,8 +405,8 @@ class SnapshotPersistence {
 
 **Scaling efficiency:**
 - ThreadSafeCache: деградирует на 4+ потоках (contention)
-- ShardedCache<16>: 5.2x speedup на 16 ядрах
-- ShardedCache<32>: 8.0x speedup на 16 ядрах
+- ShardedCache<16>: 5.2x speedup на 16 потоков
+- ShardedCache<32>: 8.0x speedup на 16 потоков
 
 **Read-heavy (100% GET, pre-filled):**
 - Single thread: все примерно одинаковые (~2.6M ops/s)
